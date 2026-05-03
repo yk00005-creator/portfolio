@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<!--
+  ──────────────────────────────────────────────────────────────
+  🐋 ポートフォリオ管理アプリ（APIキー不要・完全無料版）
+  ──────────────────────────────────────────────────────────────
+  【株価取得の仕組み】
+  Yahoo Finance の非公式 API を CORS プロキシ経由で叩いています。
+  APIキー不要・登録不要・完全無料。
+  ただし非公式APIなので稀に取得失敗することがあります。
+
+  【GitHub Pages デプロイ手順】
+  1. GitHub で新規リポジトリを作成（例: portfolio）
+  2. このファイルを index.html としてアップロード
+  3. Settings → Pages → Source: Deploy from branch
+     branch: main / (root) → Save
+  4. https://[username].github.io/[repo]/ で公開される
+  5. スマホのブラウザで開いて「ホーム画面に追加」
+  ──────────────────────────────────────────────────────────────
+-->
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="ポートフォリオ">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b1622">
+<title>🐋 ポートフォリオ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#0b1622;color:#e2e8f0;font-family:'Noto Sans JP',system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+.mono{font-family:'JetBrains Mono',monospace;font-size:.87rem}
+.pos{color:#22c55e}.neg{color:#ef4444}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.06);background:#0b1622;position:sticky;top:0;z-index:20;gap:8px}
+.logo{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.logo-t{font-weight:700;font-size:.9rem;letter-spacing:.1em}
+.logo-s{font-size:.62rem;color:#2d4a5a;letter-spacing:.06em}
+.hdr{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.age{font-size:.67rem;color:#2d4a5a;white-space:nowrap}
+.btn{cursor:pointer;border:none;border-radius:6px;font-family:inherit;font-weight:500;transition:all .15s;display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:not(:disabled):hover{filter:brightness(1.18)}
+.btn.pr{background:#1a7a85;color:#fff;padding:7px 14px;font-size:.82rem}
+.btn.gh{background:rgba(255,255,255,.06);color:#94a3b8;padding:7px 11px;font-size:.82rem}
+.btn.sm{padding:5px 10px;font-size:.78rem}
+.btn.del{background:rgba(239,68,68,.1);color:#ef4444}
+.sg{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;padding:14px 16px 10px}
+.card{background:#111c2a;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:13px 15px}
+.cl{font-size:.67rem;color:#2d4a5a;letter-spacing:.08em;margin-bottom:4px}
+.cv{font-size:1.15rem;font-weight:500}
+.cs{font-size:.68rem;color:#3a5568;margin-top:2px}
+.drop{border:2px dashed rgba(26,122,133,.3);border-radius:12px;padding:52px 20px;text-align:center;cursor:pointer;transition:all .2s}
+.drop:hover,.drop.ov{border-color:#1a7a85;background:rgba(26,122,133,.06)}
+.tw{background:#111c2a;border:1px solid rgba(255,255,255,.06);border-radius:10px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;min-width:700px}
+th{background:rgba(26,122,133,.12);color:#3a5568;padding:9px 12px;text-align:right;font-weight:500;font-size:.72rem;letter-spacing:.05em;white-space:nowrap}
+td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.03);text-align:right;color:#94a3b8;vertical-align:middle}
+tr.row:hover td{background:rgba(26,122,133,.07)}
+tr:last-child td{border-bottom:none}
+.tl{text-align:left!important}
+.tag{display:inline-block;padding:2px 7px;border-radius:4px;font-size:.7rem;font-weight:600}
+.ts{background:rgba(255,165,0,.12);color:#f5a623}
+.tm{background:rgba(91,200,208,.15);color:#5bc8d0}
+.trr{background:rgba(239,68,68,.12);color:#ef6464}
+.to{background:rgba(148,163,184,.1);color:#64748b}
+.mbg{position:fixed;inset:0;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+.mbox{background:#111c2a;border:1px solid rgba(26,122,133,.25);border-radius:14px;padding:24px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
+.mt{font-weight:600;margin-bottom:16px;font-size:.95rem;color:#e2e8f0}
+input[type=text],input[type=number],select{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:6px;color:#e2e8f0;padding:8px 11px;font-family:inherit;font-size:.87rem;width:100%;outline:none}
+input:focus,select:focus{border-color:#1a7a85;background:rgba(26,122,133,.06)}
+select option{background:#111c2a;color:#e2e8f0}
+.lbl{font-size:.74rem;color:#4a6880;display:block;margin-bottom:3px}
+.fld{margin-bottom:11px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.notice{margin-top:10px;padding:9px 13px;background:rgba(26,122,133,.08);border-radius:6px;font-size:.78rem;color:#3a6a7a;border:1px solid rgba(26,122,133,.15)}
+.err{margin-top:10px;padding:9px 13px;background:rgba(239,68,68,.08);border-radius:6px;font-size:.8rem;color:#ef4444}
+.warn{margin-top:10px;padding:9px 13px;background:rgba(245,166,35,.08);border-radius:6px;font-size:.78rem;color:#c48c1a;border:1px solid rgba(245,166,35,.2)}
+.hint{margin-top:12px;padding:11px 13px;background:rgba(255,255,255,.02);border-radius:6px;font-size:.77rem;color:#3a5568;line-height:2}
+.prog{margin-top:10px;padding:9px 13px;background:rgba(26,122,133,.06);border-radius:6px;font-size:.78rem;color:#3a7a85}
+.spin{width:11px;height:11px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .8s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+main{padding:0 16px 80px}
+.fail-sym{color:#ef4444;font-size:.7rem;margin-top:2px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useCallback,useRef} = React;
+const SK="kujira-pf-v3", PK="kujira-px-v3";
+const ls={
+  get:k=>{try{return JSON.parse(localStorage.getItem(k))}catch{return null}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}}
+};
+const fmt=(n,d=0)=>n==null?"—":n.toLocaleString("ja-JP",{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtPct=n=>n==null?"—":`${n>=0?"+":""}${n.toFixed(2)}%`;
+const parseNum=s=>parseFloat(String(s||"").replace(/[,円%￥$\s]/g,""))||0;
+
+// CSV
+function parseCSVText(text){
+  return text.split(/\r?\n/).filter(l=>l.trim()).map(line=>{
+    const r=[];let cur="";let q=false;
+    for(const ch of line){
+      if(ch==='"'){q=!q;continue}
+      if(ch===','&&!q){r.push(cur.trim());cur="";continue}
+      cur+=ch;
+    }
+    r.push(cur.trim());return r;
+  });
+}
+const cIdx=(hs,...kws)=>hs.findIndex(h=>kws.some(k=>h.toLowerCase().includes(k.toLowerCase())));
+function detectBroker(headers){
+  const h=headers.join("|").toLowerCase();
+  if(h.includes("symbol")||h.includes("qty")||h.includes("last price"))return"moomoo";
+  if(h.includes("ティッカー")||(h.includes("保有株数")&&h.includes("ドル")))return"sbi-us";
+  if(h.includes("保有口数")||h.includes("ファンドコード"))return"sbi-trust";
+  if(h.includes("保有株数")||h.includes("銘柄コード"))return"sbi-jp";
+  if(h.includes("保有数量")&&(h.includes("取得単価")||h.includes("損益")))return"rakuten";
+  return"unknown";
+}
+function rows2h(rows,headers,type,broker,currency){
+  const cI=cIdx(headers,"銘柄コード","コード","ティッカー","symbol");
+  const nI=cIdx(headers,"銘柄名","name","ファンド名");
+  const qI=cIdx(headers,"保有株数","保有数量","保有口数","qty","shares");
+  const aI=cIdx(headers,"平均取得単価","取得単価","avg cost");
+  return rows
+    .filter(r=>r.length>Math.max(cI,qI)&&r[cI]?.trim()&&!/^[-ー=\s]+$/.test(r[cI]))
+    .map(r=>({
+      id:crypto.randomUUID(),symbol:r[cI]?.trim()||"",
+      name:nI>=0?r[nI]?.trim()||"":"",
+      type,currency,broker,
+      quantity:parseNum(r[qI]),avgCost:aI>=0?parseNum(r[aI]):0,
+      currentPrice:null,manualPrice:null
+    }));
+}
+function processCSV(text){
+  const rows=parseCSVText(text);
+  if(!rows.length)return[];
+  let hIdx=0;
+  for(let i=0;i<Math.min(10,rows.length);i++){if(rows[i].filter(Boolean).length>=3){hIdx=i;break}}
+  const headers=rows[hIdx],dataRows=rows.slice(hIdx+1),broker=detectBroker(headers);
+  if(broker==="moomoo")return rows2h(dataRows,headers,"us-stock","moomoo","USD");
+  if(broker==="sbi-us")return rows2h(dataRows,headers,"us-stock","SBI","USD");
+  if(broker==="sbi-jp")return rows2h(dataRows,headers,"jp-stock","SBI","JPY");
+  if(broker==="rakuten"){
+    const isUS=headers.join(",").includes("ドル")||headers.join(",").toLowerCase().includes("usd");
+    return rows2h(dataRows,headers,isUS?"us-stock":"jp-stock","楽天",isUS?"USD":"JPY");
+  }
+  if(broker==="sbi-trust"){
+    const cI=cIdx(headers,"ファンドコード","銘柄コード");
+    const nI=cIdx(headers,"ファンド名","銘柄名");
+    const qI=cIdx(headers,"保有口数");
+    const aI=cIdx(headers,"取得単価","平均取得単価");
+    const pI=cIdx(headers,"基準価額");
+    return dataRows.filter(r=>r[cI]?.trim()).map(r=>({
+      id:crypto.randomUUID(),symbol:r[cI]?.trim(),
+      name:nI>=0?r[nI]?.trim():"",type:"trust",currency:"JPY",broker:"SBI",
+      quantity:parseNum(r[qI]),avgCost:aI>=0?parseNum(r[aI]):0,
+      currentPrice:pI>=0?parseNum(r[pI]):null,manualPrice:null
+    }));
+  }
+  return rows2h(dataRows,headers,"jp-stock","不明","JPY");
+}
+
+// Yahoo Finance via CORS proxy
+const PROXIES=[
+  url=>`https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url=>`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+];
+async function yahooFetch(symbol){
+  const url=`https://query1.finance.yahoo.com/v8/chart/${symbol}?interval=1d&range=1d`;
+  for(const mkP of PROXIES){
+    try{
+      const res=await fetch(mkP(url),{signal:AbortSignal.timeout(8000)});
+      if(!res.ok)continue;
+      const data=await res.json();
+      const price=data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+      if(price!=null)return price;
+    }catch{}
+  }
+  return null;
+}
+async function fetchAllPrices(symbols,onProgress){
+  const results={};
+  const chunks=[];
+  for(let i=0;i<symbols.length;i+=4)chunks.push(symbols.slice(i,i+4));
+  let done=0;
+  for(const chunk of chunks){
+    const settled=await Promise.allSettled(chunk.map(s=>yahooFetch(s)));
+    settled.forEach((r,i)=>{
+      results[chunk[i]]=r.status==="fulfilled"?r.value:null;
+      done++;
+      onProgress?.(done,symbols.length,chunk[i]);
+    });
+  }
+  return results;
+}
+
+const yahooSym=h=>{
+  if(h.type==="trust")return null;
+  if(h.type==="us-stock")return h.symbol.toUpperCase();
+  const c=h.symbol.replace(/\.T$/i,"");
+  return /^\d{4}$/.test(c)?`${c}.T`:h.symbol;
+};
+
+function calc(h,prices,fx){
+  const sym=yahooSym(h);
+  let cp=h.manualPrice;
+  if(!cp&&sym&&prices[sym]!=null)cp=prices[sym];
+  if(!cp&&h.currentPrice!=null)cp=h.currentPrice;
+  if(cp==null)return{...h,evalJPY:null,evalUSD:null,plJPY:null,plPct:null,currentPrice:null};
+  const isUSD=h.currency==="USD";
+  const mul=h.type==="trust"?h.quantity/10000:h.quantity;
+  const evalN=cp*mul,costN=h.avgCost*mul,plN=evalN-costN;
+  const evalJPY=isUSD?evalN*(fx||150):evalN;
+  const evalUSD=isUSD?evalN:evalN/(fx||150);
+  const plJPY=isUSD?plN*(fx||150):plN;
+  const plPct=costN>0?(plN/costN)*100:null;
+  return{...h,currentPrice:cp,evalJPY,evalUSD,plJPY,plPct};
+}
+
+const Dash=()=><span style={{color:"#2d4a5a"}}>—</span>;
+function Modal({onClose,children}){
+  return(<div className="mbg" onClick={e=>e.target===e.currentTarget&&onClose()}><div className="mbox">{children}</div></div>);
+}
+const Field=({label,children})=>(<div className="fld"><label className="lbl">{label}</label>{children}</div>);
+const Card=({label,main,sub,color})=>(
+  <div className="card">
+    <div className="cl">{label}</div>
+    <div className="cv mono" style={color?{color}:{}}>{main}</div>
+    {sub&&<div className="cs">{sub}</div>}
+  </div>
+);
+
+function AddModal({onClose,onAdd}){
+  const [f,setF]=useState({symbol:"",name:"",type:"jp-stock",quantity:"",avgCost:"",broker:"SBI",manualPrice:""});
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const tmap={"jp-stock":"JPY","us-stock":"USD","trust":"JPY"};
+  return(
+    <Modal onClose={onClose}>
+      <div className="mt">銘柄を追加</div>
+      <div className="g2">
+        <Field label="銘柄コード / ティッカー *">
+          <input type="text" value={f.symbol} onChange={e=>s("symbol",e.target.value)} placeholder="VOO / 7203 / 2558"/>
+        </Field>
+        <Field label="種別">
+          <select value={f.type} onChange={e=>s("type",e.target.value)}>
+            <option value="jp-stock">日本株・東証ETF</option>
+            <option value="us-stock">米国株・ETF</option>
+            <option value="trust">投資信託</option>
+          </select>
+        </Field>
+      </div>
+      <Field label="銘柄名（任意）">
+        <input type="text" value={f.name} onChange={e=>s("name",e.target.value)} placeholder="eMAXIS Slim 米国株式 など"/>
+      </Field>
+      <div className="g2">
+        <Field label={f.type==="trust"?"保有口数 *":"保有株数 *"}>
+          <input type="number" value={f.quantity} onChange={e=>s("quantity",e.target.value)} placeholder="0"/>
+        </Field>
+        <Field label={`平均取得単価（${tmap[f.type]}）`}>
+          <input type="number" value={f.avgCost} onChange={e=>s("avgCost",e.target.value)} placeholder="0"/>
+        </Field>
+      </div>
+      <div className="g2">
+        <Field label="証券会社">
+          <select value={f.broker} onChange={e=>s("broker",e.target.value)}>
+            {["SBI","moomoo","楽天","その他"].map(b=><option key={b} value={b}>{b}</option>)}
+          </select>
+        </Field>
+        {f.type==="trust"&&(
+          <Field label="基準価額（手動）">
+            <input type="number" value={f.manualPrice} onChange={e=>s("manualPrice",e.target.value)} placeholder="20000"/>
+          </Field>
+        )}
+      </div>
+      <div style={{display:"flex",justifyContent:"flex-end",gap:"8px",marginTop:"16px"}}>
+        <button className="btn gh" onClick={onClose}>キャンセル</button>
+        <button className="btn pr" disabled={!f.symbol||!f.quantity}
+          onClick={()=>onAdd({
+            id:crypto.randomUUID(),symbol:f.symbol.toUpperCase(),name:f.name,
+            type:f.type,currency:tmap[f.type],broker:f.broker,
+            quantity:parseFloat(f.quantity),avgCost:parseFloat(f.avgCost)||0,
+            currentPrice:f.manualPrice?parseFloat(f.manualPrice):null,
+            manualPrice:f.manualPrice?parseFloat(f.manualPrice):null
+          })}>追加</button>
+      </div>
+    </Modal>
+  );
+}
+
+function App(){
+  const [holdings,setHoldings]=useState([]);
+  const [prices,setPrices]=useState({});
+  const [fx,setFx]=useState(null);
+  const [loading,setLoading]=useState(false);
+  const [progress,setProgress]=useState(null);
+  const [failedSyms,setFailedSyms]=useState([]);
+  const [error,setError]=useState(null);
+  const [ready,setReady]=useState(false);
+  const [showUpload,setShowUpload]=useState(false);
+  const [showAdd,setShowAdd]=useState(false);
+  const [drag,setDrag]=useState(false);
+  const [ageTs,setAgeTs]=useState(null);
+  const fileRef=useRef();
+
+  useEffect(()=>{
+    const h=ls.get(SK)||[];
+    const p=ls.get(PK)||{};
+    setHoldings(h);
+    if(p.prices)setPrices(p.prices);
+    if(p.fx)setFx(p.fx);
+    if(p.ts)setAgeTs(p.ts);
+    setReady(true);
+  },[]);
+
+  useEffect(()=>{if(ready)ls.set(SK,holdings)},[holdings,ready]);
+
+  const refresh=useCallback(async()=>{
+    if(!holdings.length||loading)return;
+    setLoading(true);setError(null);setFailedSyms([]);setProgress(null);
+    const syms=[...new Set(holdings.map(yahooSym).filter(Boolean))];
+    const allSyms=[...syms,"USDJPY=X"];
+    try{
+      const result=await fetchAllPrices(allSyms,(done,total,sym)=>setProgress({done,total,sym}));
+      const newFx=result["USDJPY=X"]||fx;
+      const newPrices={...result};delete newPrices["USDJPY=X"];
+      const failed=syms.filter(s=>result[s]==null);
+      setFailedSyms(failed);
+      setPrices(newPrices);
+      if(newFx)setFx(newFx);
+      const ts=Date.now();setAgeTs(ts);
+      ls.set(PK,{prices:newPrices,fx:newFx,ts});
+      if(failed.length>0&&failed.length===syms.length)
+        setError("全銘柄の取得に失敗しました。しばらく待ってから再試行してください。");
+    }catch(e){
+      setError("価格取得に失敗しました。ネットワークを確認してください。");
+    }
+    setLoading(false);setProgress(null);
+  },[holdings,fx,loading]);
+
+  const handleFile=useCallback((file)=>{
+    if(!file?.name.endsWith(".csv"))return;
+    const tryParse=enc=>{
+      const reader=new FileReader();
+      reader.onload=e=>{
+        const text=e.target.result;
+        const hasJP=/[ぁ-ん]|[ァ-ヴ]|[一-龯]/.test(text);
+        if(!hasJP&&enc==="UTF-8"){tryParse("Shift_JIS");return}
+        try{
+          const parsed=processCSV(text);
+          if(!parsed.length){alert("銘柄データが読み取れませんでした");return}
+          setHoldings(prev=>{
+            const next=[...prev];
+            parsed.forEach(p=>{
+              const i=next.findIndex(x=>x.symbol===p.symbol&&x.broker===p.broker);
+              if(i>=0)next[i]={...next[i],...p,id:next[i].id};
+              else next.push(p);
+            });
+            return next;
+          });
+          setShowUpload(false);
+        }catch(err){alert("読み込みエラー: "+err.message)}
+      };
+      reader.readAsText(file,enc);
+    };
+    tryParse("UTF-8");
+  },[]);
+
+  const onDrop=useCallback(e=>{e.preventDefault();setDrag(false);handleFile(e.dataTransfer.files[0])},[handleFile]);
+
+  const rows=holdings.map(h=>calc(h,prices,fx));
+  const totalJPY=rows.reduce((s,h)=>s+(h.evalJPY||0),0);
+  const totalPL=rows.reduce((s,h)=>s+(h.plJPY||0),0);
+  const totalCost=rows.reduce((s,h)=>{
+    const m=h.type==="trust"?h.quantity/10000:h.quantity;
+    return s+(h.currency==="USD"?h.avgCost*m*(fx||150):h.avgCost*m);
+  },0);
+  const totalPct=totalCost>0?(totalPL/totalCost)*100:null;
+  const ageStr=ageTs?(()=>{
+    const m=Math.floor((Date.now()-ageTs)/60000);
+    if(m<1)return"直前";if(m<60)return`${m}分前`;
+    return`${Math.floor(m/60)}時間前`;
+  })():null;
+
+  if(!ready)return(<div style={{display:"flex",alignItems:"center",justifyContent:"center",height:"100vh",color:"#2d4a5a"}}>読み込み中…</div>);
+
+  return(
+    <div style={{minHeight:"100vh"}}>
+      <header className="header">
+        <div className="logo">
+          <span style={{fontSize:"1.3rem"}}>🐋</span>
+          <div>
+            <div className="logo-t">PORTFOLIO</div>
+            <div className="logo-s">期待値で鯨になる</div>
+          </div>
+        </div>
+        <div className="hdr">
+          {ageStr&&<span className="age">{ageStr}更新</span>}
+          <button className="btn gh sm" onClick={()=>setShowAdd(true)}>＋</button>
+          <button className="btn gh sm" onClick={()=>setShowUpload(true)}>📂</button>
+          <button className="btn pr sm" onClick={refresh} disabled={loading||!holdings.length}>
+            {loading?<span className="spin"/>:"🔄"} {loading?"取得中…":"価格更新"}
+          </button>
+        </div>
+      </header>
+
+      {holdings.length>0&&(
+        <div className="sg">
+          <Card label="評価額合計" main={`¥${fmt(totalJPY)}`} sub={fx?`USD/JPY ${fmt(fx,2)}`:null}/>
+          <Card label="含み損益" main={`${totalPL>=0?"+":""}¥${fmt(totalPL)}`}
+            sub={totalPct!=null?fmtPct(totalPct):null}
+            color={totalPL>=0?"#22c55e":"#ef4444"}/>
+          <Card label="銘柄数" main={`${holdings.length}銘柄`}
+            sub={[...new Set(holdings.map(h=>h.broker))].join(" · ")}/>
+        </div>
+      )}
+
+      <main>
+        {progress&&(
+          <div className="prog">🔄 取得中… {progress.done}/{progress.total}（{progress.sym}）</div>
+        )}
+
+        {!holdings.length?(
+          <div className={`drop ${drag?"ov":""}`}
+            onDragOver={e=>{e.preventDefault();setDrag(true)}}
+            onDragLeave={()=>setDrag(false)}
+            onDrop={onDrop}
+            onClick={()=>setShowUpload(true)}>
+            <div style={{fontSize:"2.5rem",marginBottom:"12px"}}>📊</div>
+            <div style={{fontWeight:500,color:"#e2e8f0",marginBottom:"6px"}}>CSVをドロップ、またはタップ</div>
+            <div style={{fontSize:".82rem",color:"#3a5568"}}>SBI / moomoo / 楽天 に対応</div>
+          </div>
+        ):(
+          <div className="tw">
+            <table>
+              <thead><tr>
+                <th className="tl">銘柄</th>
+                <th className="tl">証券会社</th>
+                <th>株数</th>
+                <th>取得単価</th>
+                <th>現在値</th>
+                <th>評価額(円)</th>
+                <th>評価額(USD)</th>
+                <th>含み損益(円)</th>
+                <th>損益率</th>
+                <th></th>
+              </tr></thead>
+              <tbody>
+                {rows.map(h=>{
+                  const pos=h.plJPY!=null&&h.plJPY>=0;
+                  const neg=h.plJPY!=null&&h.plJPY<0;
+                  const tc={SBI:"ts",moomoo:"tm","楽天":"trr"}[h.broker]||"to";
+                  const sym=yahooSym(h);
+                  const failed=sym&&failedSyms.includes(sym);
+                  return(
+                    <tr key={h.id} className="row">
+                      <td className="tl">
+                        <div style={{fontWeight:500,color:"#f1f5f9",fontSize:".87rem"}}>{h.symbol}</div>
+                        {h.name&&<div style={{fontSize:".68rem",color:"#3a5568",marginTop:"1px"}}>{h.name}</div>}
+                        {failed&&<div className="fail-sym">取得失敗</div>}
+                      </td>
+                      <td className="tl"><span className={`tag ${tc}`}>{h.broker}</span></td>
+                      <td className="mono">{fmt(h.quantity)}</td>
+                      <td className="mono">
+                        {h.avgCost?(h.currency==="USD"?`$${fmt(h.avgCost,2)}`:`¥${fmt(h.avgCost)}`):(<Dash/>)}
+                      </td>
+                      <td className="mono">
+                        {h.currentPrice!=null
+                          ?(h.currency==="USD"?`$${fmt(h.currentPrice,2)}`:h.type==="trust"?`¥${fmt(h.currentPrice,2)}`:`¥${fmt(h.currentPrice)}`)
+                          :(<Dash/>)}
+                      </td>
+                      <td className="mono">{h.evalJPY!=null?`¥${fmt(h.evalJPY)}`:(<Dash/>)}</td>
+                      <td className="mono">{h.evalUSD!=null?`$${fmt(h.evalUSD)}`:(<Dash/>)}</td>
+                      <td className={`mono ${pos?"pos":neg?"neg":""}`}>
+                        {h.plJPY!=null?`${h.plJPY>=0?"+":""}¥${fmt(h.plJPY)}`:(<Dash/>)}
+                      </td>
+                      <td className={`mono ${pos?"pos":neg?"neg":""}`}>
+                        {h.plPct!=null?fmtPct(h.plPct):(<Dash/>)}
+                      </td>
+                      <td>
+                        <button className="btn gh sm del"
+                          onClick={()=>setHoldings(p=>p.filter(x=>x.id!==h.id))}>削除</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {holdings.some(h=>h.type==="trust")&&(
+          <div className="notice">💡 投資信託の基準価額はAPIで取得できません。CSVを再読み込みで更新されます。</div>
+        )}
+        {failedSyms.length>0&&failedSyms.length<holdings.length&&(
+          <div className="warn">⚠️ 取得失敗: {failedSyms.join(", ")}　―　再試行するか時間をおいてください。</div>
+        )}
+        {error&&<div className="err">⚠️ {error}</div>}
+        <div className="notice" style={{marginTop:"14px",fontSize:".72rem"}}>
+          📡 Yahoo Finance の非公式APIを使用。市場閉場中は前日終値が表示されます。
+        </div>
+      </main>
+
+      {showUpload&&(
+        <Modal onClose={()=>setShowUpload(false)}>
+          <div className="mt">📂 CSV読み込み</div>
+          <div className={`drop ${drag?"ov":""}`} style={{padding:"28px"}}
+            onDragOver={e=>{e.preventDefault();setDrag(true)}}
+            onDragLeave={()=>setDrag(false)}
+            onDrop={onDrop}
+            onClick={()=>fileRef.current.click()}>
+            <div style={{fontSize:"1.8rem",marginBottom:"8px"}}>📂</div>
+            <div style={{color:"#e2e8f0",fontWeight:500,marginBottom:"4px"}}>CSVをドロップ / タップして選択</div>
+            <div style={{fontSize:".77rem",color:"#3a5568"}}>SBI / moomoo / 楽天 を自動判定 · UTF-8 / Shift-JIS 対応</div>
+          </div>
+          <input ref={fileRef} type="file" accept=".csv" style={{display:"none"}}
+            onChange={e=>{if(e.target.files[0])handleFile(e.target.files[0])}}/>
+          <div className="hint">
+            <div>• SBI → 保有銘柄一覧 → CSVダウンロード（国内・米国・投信は別ファイル）</div>
+            <div>• moomoo → ポートフォリオ → エクスポート</div>
+            <div>• 楽天 → 保有証券一覧 → CSV出力</div>
+            <div>• 同一銘柄は上書き更新（重複しません）</div>
+          </div>
+          <div style={{display:"flex",justifyContent:"flex-end",marginTop:"14px"}}>
+            <button className="btn gh" onClick={()=>setShowUpload(false)}>閉じる</button>
+          </div>
+        </Modal>
+      )}
+      {showAdd&&<AddModal onClose={()=>setShowAdd(false)} onAdd={h=>{setHoldings(p=>[...p,h]);setShowAdd(false)}}/>}
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
