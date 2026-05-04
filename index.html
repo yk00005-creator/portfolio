@@ -139,9 +139,56 @@ function rows2h(rows,headers,type,broker,currency){
       currentPrice:null,manualPrice:null
     }));
 }
+// SBI約定履歴から保有株を集計
+function parseSBITradeHistory(rows){
+  // "約定日"を含む行をヘッダーとして探す
+  const hIdx=rows.findIndex(r=>r.some(c=>c.includes("約定日")));
+  if(hIdx<0)return null;
+  const headers=rows[hIdx];
+  const dataRows=rows.slice(hIdx+1).filter(r=>r.some(c=>c.trim()));
+  const nameI=cIdx(headers,"銘柄");
+  const codeI=cIdx(headers,"銘柄コード");
+  const tradeI=cIdx(headers,"取引");
+  const qtyI=cIdx(headers,"約定数量");
+  const priceI=cIdx(headers,"約定単価");
+  if(codeI<0||qtyI<0||priceI<0)return null;
+  const map={};
+  for(const r of dataRows){
+    const code=r[codeI]?.trim();
+    if(!code||!/^\d{4}$/.test(code))continue;
+    const name=nameI>=0?r[nameI]?.trim()||"":"";
+    const trade=r[tradeI]?.trim()||"";
+    const qty=parseNum(r[qtyI]);
+    const price=parseNum(r[priceI]);
+    if(!qty||!price)continue;
+    const isBuy=trade.includes("買");
+    const isSell=trade.includes("売");
+    if(!isBuy&&!isSell)continue;
+    if(!map[code])map[code]={code,name,qty:0,totalCost:0};
+    if(isBuy){
+      map[code].totalCost+=qty*price;
+      map[code].qty+=qty;
+    }else{
+      const avg=map[code].qty>0?map[code].totalCost/map[code].qty:0;
+      map[code].qty=Math.max(0,map[code].qty-qty);
+      map[code].totalCost=avg*map[code].qty;
+    }
+  }
+  const result=Object.values(map).filter(h=>h.qty>0).map(h=>({
+    id:crypto.randomUUID(),symbol:h.code,name:h.name,
+    type:"jp-stock",currency:"JPY",broker:"SBI",
+    quantity:h.qty,avgCost:h.qty>0?h.totalCost/h.qty:0,
+    currentPrice:null,manualPrice:null
+  }));
+  return result.length>0?result:null;
+}
+
 function processCSV(text){
   const rows=parseCSVText(text);
   if(!rows.length)return[];
+  // SBI約定履歴を先に判定
+  const tradeResult=parseSBITradeHistory(rows);
+  if(tradeResult)return tradeResult;
   let hIdx=0;
   for(let i=0;i<Math.min(10,rows.length);i++){if(rows[i].filter(Boolean).length>=3){hIdx=i;break}}
   const headers=rows[hIdx],dataRows=rows.slice(hIdx+1),broker=detectBroker(headers);
